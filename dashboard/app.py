@@ -1,10 +1,15 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+from pathlib import Path
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics.pairwise import cosine_similarity
 
 st.set_page_config(page_title="Recomendador de Compañeros Deportivos", layout="wide")
+
+# Carpeta donde vive este mismo archivo app.py (sin importar desde dónde se ejecute)
+BASE_DIR = Path(__file__).resolve().parent
+DATA_DIR = BASE_DIR / "data"
 
 # ──────────────────────────────────────────────────────────────
 # 1. CARGA DE DATOS (con cache para que no se recargue en cada clic)
@@ -12,9 +17,9 @@ st.set_page_config(page_title="Recomendador de Compañeros Deportivos", layout="
 
 @st.cache_data
 def cargar_datos():
-    encuesta = pd.read_csv("data/encuesta_limpia.csv")
-    clusters = pd.read_csv("data/estudiantes_clusters_ponderado.csv")
-    similitud = pd.read_csv("data/similitud_ponderada.csv")
+    encuesta = pd.read_csv(DATA_DIR / "encuesta_limpia.csv")
+    clusters = pd.read_csv(DATA_DIR / "estudiantes_clusters_ponderado.csv")
+    similitud = pd.read_csv(DATA_DIR / "similitud_ponderada.csv")
     encuesta["id_estudiante"] = encuesta.index
     encuesta = encuesta.merge(clusters, on="id_estudiante", how="left")
     return encuesta, similitud

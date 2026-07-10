@@ -231,6 +231,36 @@ def mostrar_perfil(fila: pd.Series):
     st.markdown(badge_cluster(fila["cluster"]), unsafe_allow_html=True)
 
 
+def _fila_tabla_html(fila: dict, similitud_max: float = 1.0) -> str:
+    porcentaje = max(0.0, min(100.0, (fila["Similitud"] / similitud_max) * 100))
+    _, color_cluster = CLUSTER_INFO.get(fila["Cluster"], ("", "#5B5458"))
+    return f"""
+    <tr>
+        <td style="padding:0.6rem 0.8rem; font-weight:600; color:#211A1C;">{fila['ID']}</td>
+        <td style="padding:0.6rem 0.8rem; min-width:160px;">
+            <div style="display:flex; align-items:center; gap:0.6rem;">
+                <div style="flex:1; background:#EFE2E5; border-radius:999px; height:8px; overflow:hidden;">
+                    <div style="width:{porcentaje:.1f}%; background:#7A1F35; height:100%; border-radius:999px;"></div>
+                </div>
+                <span style="font-weight:700; color:#7A1F35; font-size:0.85rem; white-space:nowrap;">
+                    {porcentaje:.0f}%
+                </span>
+            </div>
+        </td>
+        <td style="padding:0.6rem 0.8rem; color:#211A1C;">{fila['Personalidad']}</td>
+        <td style="padding:0.6rem 0.8rem; color:#211A1C;">{fila['Horario']}</td>
+        <td style="padding:0.6rem 0.8rem; color:#211A1C;">{fila['Motivación']}</td>
+        <td style="padding:0.6rem 0.8rem; color:#211A1C;">{fila['Días']}</td>
+        <td style="padding:0.6rem 0.8rem;">
+            <span style="display:inline-flex; align-items:center; gap:0.35rem; font-size:0.85rem; color:#211A1C;">
+                <span style="width:9px; height:9px; border-radius:50%; background:{color_cluster}; display:inline-block;"></span>
+                {fila['Cluster']}
+            </span>
+        </td>
+    </tr>
+    """
+
+
 def mostrar_tabla_top10(top10: pd.DataFrame):
     filas = []
     for _, r in top10.iterrows():
@@ -246,27 +276,50 @@ def mostrar_tabla_top10(top10: pd.DataFrame):
         })
     df_tabla = pd.DataFrame(filas)
 
-    # KPIs por encima de la tabla: lo más importante se lee sin escanear las 10 filas
-    k1, k2, k3 = st.columns(3)
-    k1.metric("Similitud promedio del TOP-10", f"{df_tabla['Similitud'].mean():.3f}")
-    k2.metric("Similitud más alta", f"{df_tabla['Similitud'].max():.3f}")
-    cluster_predominante = int(df_tabla["Cluster"].mode()[0])
-    k3.metric("Cluster predominante", cluster_predominante)
+    # KPIs con lenguaje directo: se evita jerga técnica ("similitud ponderada")
+    # y se usa porcentaje en vez de decimales (0.729 es menos intuitivo que 73%).
+    mejor = df_tabla.iloc[0]
+    cluster_top_id = int(df_tabla["Cluster"].mode()[0])
+    nombre_cluster_top, _ = CLUSTER_INFO.get(cluster_top_id, (f"Cluster {cluster_top_id}", "#5B5458"))
 
-    st.dataframe(
-        df_tabla,
-        use_container_width=True,
-        hide_index=True,
-        column_config={
-            "Similitud": st.column_config.ProgressColumn(
-                "Similitud",
-                help="Similitud coseno ponderada (0 a 1) frente a los 7 grupos de variables",
-                min_value=0.0,
-                max_value=float(df_tabla["Similitud"].max()) if len(df_tabla) else 1.0,
-                format="%.3f",
-            ),
-        },
+    k1, k2, k3 = st.columns(3)
+    k1.metric(
+        "Compatibilidad promedio con tus 10 recomendados",
+        f"{df_tabla['Similitud'].mean() * 100:.0f}%",
     )
+    k2.metric(
+        "Tu compañero más compatible",
+        f"#{int(mejor['ID'])} ({mejor['Similitud'] * 100:.0f}%)",
+    )
+    k3.metric(
+        "Grupo con más compañeros afines",
+        nombre_cluster_top,
+    )
+
+    st.markdown("<div style='height:0.6rem'></div>", unsafe_allow_html=True)
+
+    filas_html = "".join(_fila_tabla_html(f) for f in filas)
+    tabla_html = f"""
+    <div style="overflow-x:auto; border:1px solid #E8DEE0; border-radius:10px;">
+    <table style="width:100%; border-collapse:collapse; font-family:'Inter',sans-serif; font-size:0.88rem;">
+        <thead>
+            <tr style="background:#FAF7F7; border-bottom:1px solid #E8DEE0;">
+                <th style="padding:0.6rem 0.8rem; text-align:left; color:#5B5458; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.03em;">ID</th>
+                <th style="padding:0.6rem 0.8rem; text-align:left; color:#5B5458; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.03em;">Compatibilidad</th>
+                <th style="padding:0.6rem 0.8rem; text-align:left; color:#5B5458; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.03em;">Personalidad</th>
+                <th style="padding:0.6rem 0.8rem; text-align:left; color:#5B5458; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.03em;">Horario</th>
+                <th style="padding:0.6rem 0.8rem; text-align:left; color:#5B5458; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.03em;">Motivación</th>
+                <th style="padding:0.6rem 0.8rem; text-align:left; color:#5B5458; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.03em;">Días</th>
+                <th style="padding:0.6rem 0.8rem; text-align:left; color:#5B5458; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.03em;">Cluster</th>
+            </tr>
+        </thead>
+        <tbody>
+            {filas_html}
+        </tbody>
+    </table>
+    </div>
+    """
+    st.markdown(tabla_html, unsafe_allow_html=True)
 
 
 # ──────────────────────────────────────────────────────────────
@@ -411,19 +464,18 @@ if modo == "Buscar estudiante existente":
 
     fila = encuesta.loc[encuesta.id_estudiante == id_sel].iloc[0]
 
-    col1, col2 = st.columns([1, 2])
-    with col1:
-        with st.container(border=True):
-            st.markdown('<div class="card-eyebrow">PERFIL</div>', unsafe_allow_html=True)
-            st.subheader(f"Estudiante #{id_sel}")
-            mostrar_perfil(fila)
+    with st.container(border=True):
+        st.markdown('<div class="card-eyebrow">PERFIL</div>', unsafe_allow_html=True)
+        st.subheader(f"Estudiante #{id_sel}")
+        mostrar_perfil(fila)
 
-    with col2:
-        with st.container(border=True):
-            st.markdown('<div class="card-eyebrow">RECOMENDACIONES</div>', unsafe_allow_html=True)
-            st.subheader("TOP-10 compañeros más compatibles")
-            top10 = top10_para_id(id_sel)
-            mostrar_tabla_top10(top10)
+    st.markdown("<div style='height:1rem'></div>", unsafe_allow_html=True)
+
+    with st.container(border=True):
+        st.markdown('<div class="card-eyebrow">RECOMENDACIONES</div>', unsafe_allow_html=True)
+        st.subheader("TOP-10 compañeros más compatibles")
+        top10 = top10_para_id(id_sel)
+        mostrar_tabla_top10(top10)
 
 else:
     st.header("Ingresa tu perfil")

@@ -406,6 +406,43 @@ st.markdown("""
         border-radius: 8px;
         padding: 0.4rem 0.6rem;
     }
+    /* Punto del radio: Streamlit lo pinta rojo por defecto; lo forzamos a granate */
+    section[data-testid="stSidebar"] div[role="radiogroup"] label div:first-child {
+        border-color: #7A1F35 !important;
+    }
+    section[data-testid="stSidebar"] div[role="radiogroup"] label div:first-child > div {
+        background-color: #7A1F35 !important;
+    }
+    /* Texto de la opción seleccionada en negrita, la no seleccionada más discreta */
+    section[data-testid="stSidebar"] div[role="radiogroup"] label[data-checked="true"] p {
+        color: #211A1C;
+        font-weight: 700;
+    }
+    section[data-testid="stSidebar"] div[role="radiogroup"] p {
+        color: #5B5458;
+        font-size: 0.92rem;
+    }
+
+    /* Eyebrow del sidebar (encabezado "MENÚ") */
+    .sidebar-eyebrow {
+        color: #7A1F35;
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        margin: 0 0 0.5rem 0;
+    }
+
+    /* Expander del sidebar: título en granate, borde consistente con las tarjetas */
+    section[data-testid="stSidebar"] [data-testid="stExpander"] {
+        border: 1px solid #E8DEE0;
+        border-radius: 10px;
+        background: #FFFFFF;
+    }
+    section[data-testid="stSidebar"] [data-testid="stExpander"] summary {
+        color: #5C1626;
+        font-weight: 600;
+    }
 
     h2, h3 {
         color: #5C1626;
@@ -417,13 +454,14 @@ st.markdown("""
         color: #211A1C;
     }
 
-    /* Sliders: pista y punto en color institucional (por defecto Streamlit los pinta rojo/naranja) */
+    /* Sliders: el punto (thumb) usa un atributo ARIA estable (role="slider"),
+    por eso es seguro sobreescribirlo. El riel de color, en cambio, no tiene
+    un selector estable entre versiones de Streamlit — forzarlo con selectores
+    de posición (nth-child) rompía otros elementos internos del slider, así que
+    se dejó fuera. Ese color depende del tema configurado en config.toml. */
     div[data-testid="stSlider"] [role="slider"] {
         background-color: #7A1F35 !important;
         border-color: #7A1F35 !important;
-    }
-    div[data-testid="stSlider"] > div > div > div > div {
-        background-color: #7A1F35 !important;
     }
 
     /* Multiselect: etiquetas seleccionadas en color institucional */
@@ -447,7 +485,7 @@ st.markdown("""
 # 5. SIDEBAR
 # ──────────────────────────────────────────────────────────────
 
-st.sidebar.markdown("#### Menú")
+st.sidebar.markdown('<div class="sidebar-eyebrow">MENÚ</div>', unsafe_allow_html=True)
 modo = st.sidebar.radio(
     "¿Qué quieres hacer?",
     ["Buscar estudiante existente", "Soy un estudiante nuevo"],

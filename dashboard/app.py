@@ -70,6 +70,19 @@ COLS_SOCIAL = GRUPOS["social"][0]
 scaler = MinMaxScaler()
 scaler.fit(encuesta[COLS_SOCIAL])
 
+# Nombres y colores de los 7 clústeres (Tabla 2, Fase II de la tesis).
+# Mostrar el nombre real (no solo el número) es clave para que alguien que no
+# leyó la tesis entienda de inmediato a qué perfil de grupo pertenece.
+CLUSTER_INFO = {
+    0: ("Extrovertidos matutinos activos", "#7A1F35"),
+    1: ("Ambidivertidos nocturnos orientados a la salud", "#3E6B8A"),
+    2: ("Introvertidos matutinos orientados a la salud", "#2F7D5B"),
+    3: ("Ambidivertidos matutinos activos", "#B5762A"),
+    4: ("Ambidivertidos vespertinos activos", "#6B4E9E"),
+    5: ("Introvertidos vespertinos orientados a la salud", "#46807C"),
+    6: ("Ambidivertidos vespertino-nocturnos orientados al bienestar", "#8A4A2F"),
+}
+
 
 def nombre_personalidad(row):
     for c in GRUPOS["personalidad"][0]:
@@ -100,6 +113,17 @@ def dias_disponibles(row):
 def deportes_practicados(row):
     deportes = [c.split("_")[-1] for c in GRUPOS["deportes"][0] if row[c] == 1]
     return ", ".join(deportes) if deportes else "Ninguno registrado"
+
+
+def badge_cluster(cluster_id: int) -> str:
+    nombre, color = CLUSTER_INFO.get(int(cluster_id), (f"Cluster {cluster_id}", "#5B5458"))
+    return (
+        f'<span style="background:{color}1A; color:{color}; border:1px solid {color}55; '
+        f'padding:0.25rem 0.65rem; border-radius:999px; font-size:0.82rem; font-weight:600; '
+        f'display:inline-flex; align-items:center; gap:0.4rem;">'
+        f'<span style="width:8px; height:8px; border-radius:50%; background:{color}; display:inline-block;"></span>'
+        f'{int(cluster_id)} · {nombre}</span>'
+    )
 
 
 # ──────────────────────────────────────────────────────────────
@@ -186,12 +210,25 @@ def asignar_cluster_nuevo(top_vecinos: pd.DataFrame, k_vecinos: int = 15) -> int
 
 
 def mostrar_perfil(fila: pd.Series):
-    st.write(f"**Personalidad:** {nombre_personalidad(fila)}")
-    st.write(f"**Horario preferido:** {nombre_horario(fila)}")
-    st.write(f"**Días disponibles:** {dias_disponibles(fila)}")
-    st.write(f"**Motivación principal:** {nombre_motivacion(fila)}")
-    st.write(f"**Deportes que practica:** {deportes_practicados(fila)}")
-    st.write(f"**Cluster:** {int(fila['cluster'])}")
+    campos = [
+        ("Personalidad", nombre_personalidad(fila)),
+        ("Horario preferido", nombre_horario(fila)),
+        ("Días disponibles", dias_disponibles(fila)),
+        ("Motivación principal", nombre_motivacion(fila)),
+        ("Deportes que practica", deportes_practicados(fila)),
+    ]
+    filas_html = "".join(
+        f'<div style="display:flex; justify-content:space-between; gap:1rem; '
+        f'padding:0.45rem 0; border-bottom:1px solid #EFE7E8;">'
+        f'<span style="color:#5B5458; font-size:0.82rem; text-transform:uppercase; '
+        f'letter-spacing:0.02em;">{label}</span>'
+        f'<span style="color:#211A1C; font-weight:600; text-align:right;">{valor}</span>'
+        f'</div>'
+        for label, valor in campos
+    )
+    st.markdown(filas_html, unsafe_allow_html=True)
+    st.markdown("<div style='height:0.6rem'></div>", unsafe_allow_html=True)
+    st.markdown(badge_cluster(fila["cluster"]), unsafe_allow_html=True)
 
 
 def mostrar_tabla_top10(top10: pd.DataFrame):
@@ -200,14 +237,36 @@ def mostrar_tabla_top10(top10: pd.DataFrame):
         fila_est = encuesta.loc[encuesta.id_estudiante == r["id_estudiante"]].iloc[0]
         filas.append({
             "ID": int(r["id_estudiante"]),
-            "Similitud": round(r["similitud_ponderada"], 3),
+            "Similitud": round(float(r["similitud_ponderada"]), 3),
             "Personalidad": nombre_personalidad(fila_est),
             "Horario": nombre_horario(fila_est),
             "Motivación": nombre_motivacion(fila_est),
             "Días": dias_disponibles(fila_est),
             "Cluster": int(fila_est["cluster"]),
         })
-    st.dataframe(pd.DataFrame(filas), use_container_width=True, hide_index=True)
+    df_tabla = pd.DataFrame(filas)
+
+    # KPIs por encima de la tabla: lo más importante se lee sin escanear las 10 filas
+    k1, k2, k3 = st.columns(3)
+    k1.metric("Similitud promedio del TOP-10", f"{df_tabla['Similitud'].mean():.3f}")
+    k2.metric("Similitud más alta", f"{df_tabla['Similitud'].max():.3f}")
+    cluster_predominante = int(df_tabla["Cluster"].mode()[0])
+    k3.metric("Cluster predominante", cluster_predominante)
+
+    st.dataframe(
+        df_tabla,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "Similitud": st.column_config.ProgressColumn(
+                "Similitud",
+                help="Similitud coseno ponderada (0 a 1) frente a los 7 grupos de variables",
+                min_value=0.0,
+                max_value=float(df_tabla["Similitud"].max()) if len(df_tabla) else 1.0,
+                format="%.3f",
+            ),
+        },
+    )
 
 
 # ──────────────────────────────────────────────────────────────
@@ -216,17 +275,21 @@ def mostrar_tabla_top10(top10: pd.DataFrame):
 
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
     html, body, [class*="css"]  {
         font-family: 'Inter', sans-serif;
+    }
+
+    .stApp {
+        background-color: #FAF7F7;
     }
 
     /* Barra superior institucional */
     .uees-header {
         background: linear-gradient(90deg, #7A1F35 0%, #5C1626 100%);
         padding: 1.4rem 2rem;
-        border-radius: 6px;
+        border-radius: 10px;
         margin-bottom: 1.5rem;
         display: flex;
         align-items: center;
@@ -237,7 +300,7 @@ st.markdown("""
         font-weight: 800;
         font-size: 1.8rem;
         color: #FFFFFF;
-        background: rgba(255,255,255,0.12);
+        background: rgba(255,255,255,0.14);
         border-radius: 8px;
         width: 48px;
         height: 48px;
@@ -259,6 +322,16 @@ st.markdown("""
         margin: 0.15rem 0 0 0;
     }
 
+    /* Encabezados de sección dentro de tarjetas */
+    .card-eyebrow {
+        color: #7A1F35;
+        font-size: 0.78rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        margin-bottom: 0.3rem;
+    }
+
     /* Botones primarios */
     .stButton > button[kind="primary"] {
         background-color: #7A1F35;
@@ -269,9 +342,27 @@ st.markdown("""
         background-color: #5C1626;
     }
 
-    /* Subheaders con acento granate */
+    /* Sidebar: segmented control para el radio de modo */
+    section[data-testid="stSidebar"] div[role="radiogroup"] {
+        background: #F3E4E8;
+        padding: 0.3rem;
+        border-radius: 10px;
+        gap: 0.2rem;
+    }
+    section[data-testid="stSidebar"] div[role="radiogroup"] label {
+        background: transparent;
+        border-radius: 8px;
+        padding: 0.4rem 0.6rem;
+    }
+
     h2, h3 {
         color: #5C1626;
+    }
+
+    /* Métricas: números tabulares para alineación consistente */
+    [data-testid="stMetricValue"] {
+        font-variant-numeric: tabular-nums;
+        color: #211A1C;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -286,7 +377,33 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-modo = st.sidebar.radio("¿Qué quieres hacer?", ["Buscar estudiante existente", "Soy un estudiante nuevo"])
+# ──────────────────────────────────────────────────────────────
+# 5. SIDEBAR
+# ──────────────────────────────────────────────────────────────
+
+st.sidebar.markdown("#### Menú")
+modo = st.sidebar.radio(
+    "¿Qué quieres hacer?",
+    ["Buscar estudiante existente", "Soy un estudiante nuevo"],
+    label_visibility="collapsed",
+)
+
+with st.sidebar.expander("¿Cómo funciona?"):
+    st.write(
+        "El sistema calcula la afinidad entre estudiantes usando similitud "
+        "coseno ponderada sobre 7 grupos de variables: personalidad (30%), "
+        "horario (25%), días disponibles (20%), motivación (15%), deportes "
+        "practicados (5%), tipo de actividad (3%) y perfil social (2%)."
+    )
+    st.write(
+        "Si eres un estudiante nuevo, tu perfil se compara en tiempo real "
+        "contra los 158 estudiantes existentes, y tu cluster se asigna por "
+        "afinidad con tus 15 vecinos más parecidos."
+    )
+
+# ──────────────────────────────────────────────────────────────
+# 6. INTERFAZ PRINCIPAL
+# ──────────────────────────────────────────────────────────────
 
 if modo == "Buscar estudiante existente":
     st.header("Buscar estudiante existente")
@@ -297,71 +414,91 @@ if modo == "Buscar estudiante existente":
     col1, col2 = st.columns([1, 2])
     with col1:
         with st.container(border=True):
-            st.subheader(f"Perfil — Estudiante #{id_sel}")
+            st.markdown('<div class="card-eyebrow">PERFIL</div>', unsafe_allow_html=True)
+            st.subheader(f"Estudiante #{id_sel}")
             mostrar_perfil(fila)
 
     with col2:
         with st.container(border=True):
+            st.markdown('<div class="card-eyebrow">RECOMENDACIONES</div>', unsafe_allow_html=True)
             st.subheader("TOP-10 compañeros más compatibles")
             top10 = top10_para_id(id_sel)
             mostrar_tabla_top10(top10)
 
 else:
     st.header("Ingresa tu perfil")
-    st.write("Responde como en la encuesta original. Tus datos no se guardan.")
+    st.caption("Responde como en la encuesta original. Tus datos no se guardan.")
 
     with st.container(border=True):
+        st.markdown('<div class="card-eyebrow">PERFIL PERSONAL</div>', unsafe_allow_html=True)
         col1, col2 = st.columns(2)
-
         with col1:
             personalidad = st.selectbox(
                 "¿Cómo describirías tu personalidad?",
                 ["Introvertida", "Extrovertida", "Ambidivertida"],
             )
+        with col2:
             motivacion = st.selectbox(
                 "¿Cuál es tu principal motivación para hacer deporte?",
                 ["Competencia", "Diversión", "Mejorar condición física",
                  "Mejorar salud", "Reducir estrés", "Socializar"],
             )
+
+    with st.container(border=True):
+        st.markdown('<div class="card-eyebrow">DISPONIBILIDAD</div>', unsafe_allow_html=True)
+        col1, col2 = st.columns(2)
+        with col1:
             horario = st.selectbox(
                 "¿En qué horarios prefieres realizar actividades deportivas?",
                 ["Mañana", "Mañana, Noche", "Mañana, Tarde", "Mañana, Tarde, Noche",
                  "Noche", "Tarde", "Tarde, Noche"],
             )
+        with col2:
             dias_sel = st.multiselect(
                 "¿Qué días tienes disponibilidad?",
                 ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"],
             )
 
-        with col2:
+    with st.container(border=True):
+        st.markdown('<div class="card-eyebrow">PREFERENCIAS DEPORTIVAS</div>', unsafe_allow_html=True)
+        col1, col2 = st.columns(2)
+        with col1:
             deportes_sel = st.multiselect(
                 "¿Qué deportes practicas o te interesan?",
                 ["Baile", "Basket", "Fútbol", "Gym/Fitness", "Natación",
                  "Pádel", "Running", "Tenis", "Tenis de mesa", "Volley"],
             )
+        with col2:
             actividad_sel = st.multiselect(
                 "¿Qué tipo de actividades prefieres?",
                 ["Al aire libre", "Bajo techo", "Competitivas",
                  "Grupales", "Individuales", "Recreativas"],
             )
-            st.write("**Perfil social** (escala 1 a 5):")
-            s1 = st.slider("Me considero una persona sociable.", 1, 5, 3)
-            s2 = st.slider("Me siento cómodo/a participando en actividades grupales.", 1, 5, 3)
-            s3 = st.slider("¿Qué tan fácil se te hace hacer nuevas amistades?", 1, 5, 3)
 
-        if st.button("Obtener mis recomendaciones", type="primary"):
-            if not dias_sel:
-                st.warning("Selecciona al menos un día de disponibilidad.")
-            else:
-                vector_nuevo = construir_vector_nuevo(
-                    personalidad, horario, dias_sel, motivacion,
-                    deportes_sel, actividad_sel, [s1, s2, s3],
-                )
-                with st.spinner("Calculando afinidad con los 158 estudiantes..."):
-                    top10 = top10_para_vector(vector_nuevo)
-                    cluster_asignado = asignar_cluster_nuevo(top10)
+    with st.container(border=True):
+        st.markdown('<div class="card-eyebrow">PERFIL SOCIAL</div>', unsafe_allow_html=True)
+        st.caption("Escala de 1 (nada de acuerdo) a 5 (totalmente de acuerdo)")
+        s1 = st.slider("Me considero una persona sociable.", 1, 5, 3)
+        s2 = st.slider("Me siento cómodo/a participando en actividades grupales.", 1, 5, 3)
+        s3 = st.slider("¿Qué tan fácil se te hace hacer nuevas amistades?", 1, 5, 3)
 
-                st.success(f"Perteneces al **Cluster {cluster_asignado}** (asignado por afinidad con tus vecinos más cercanos).")
-                with st.container(border=True):
-                    st.subheader("Tu TOP-10 de compañeros más compatibles")
-                    mostrar_tabla_top10(top10)
+    if st.button("Obtener mis recomendaciones", type="primary"):
+        if not dias_sel:
+            st.warning("Selecciona al menos un día de disponibilidad.")
+        else:
+            vector_nuevo = construir_vector_nuevo(
+                personalidad, horario, dias_sel, motivacion,
+                deportes_sel, actividad_sel, [s1, s2, s3],
+            )
+            with st.spinner("Calculando afinidad con los 158 estudiantes..."):
+                top10 = top10_para_vector(vector_nuevo)
+                cluster_asignado = asignar_cluster_nuevo(top10)
+
+            st.markdown("<div style='height:0.5rem'></div>", unsafe_allow_html=True)
+            st.markdown(badge_cluster(cluster_asignado), unsafe_allow_html=True)
+            st.markdown("<div style='height:0.8rem'></div>", unsafe_allow_html=True)
+
+            with st.container(border=True):
+                st.markdown('<div class="card-eyebrow">RECOMENDACIONES</div>', unsafe_allow_html=True)
+                st.subheader("Tu TOP-10 de compañeros más compatibles")
+                mostrar_tabla_top10(top10)

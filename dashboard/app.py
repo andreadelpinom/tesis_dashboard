@@ -394,28 +394,24 @@ st.markdown("""
         background-color: #5C1626;
     }
 
-    /* Sidebar: segmented control para el radio de modo */
+    /* Sidebar: opciones del menú sin fondo, solo texto en color institucional */
     section[data-testid="stSidebar"] div[role="radiogroup"] {
-        background: #F3E4E8;
-        padding: 0.3rem;
-        border-radius: 10px;
-        gap: 0.2rem;
+        gap: 0.3rem;
     }
     section[data-testid="stSidebar"] div[role="radiogroup"] label {
         background: transparent;
-        border-radius: 8px;
-        padding: 0.4rem 0.6rem;
+        padding: 0.3rem 0;
     }
-    /* Punto del radio: Streamlit lo pinta rojo por defecto; lo forzamos a granate */
+    /* Punto del radio: role="slider"/"radio" es un atributo ARIA estable */
     section[data-testid="stSidebar"] div[role="radiogroup"] label div:first-child {
         border-color: #7A1F35 !important;
     }
     section[data-testid="stSidebar"] div[role="radiogroup"] label div:first-child > div {
         background-color: #7A1F35 !important;
     }
-    /* Texto de la opción seleccionada en negrita, la no seleccionada más discreta */
+    /* Opción seleccionada: texto granate y en negrita. No seleccionada: gris neutro. */
     section[data-testid="stSidebar"] div[role="radiogroup"] label[data-checked="true"] p {
-        color: #211A1C;
+        color: #7A1F35;
         font-weight: 700;
     }
     section[data-testid="stSidebar"] div[role="radiogroup"] p {

@@ -121,30 +121,35 @@ def similitud_ponderada_vector(vector_a: dict, fila_b: pd.Series) -> float:
     return total
 
 
+def _col_por_categoria_exacta(cols, categoria):
+    """Encuentra la columna cuya categoría (después del primer '_') coincide
+    EXACTAMENTE con la seleccionada. Usar .endswith() aquí es incorrecto porque
+    categorías compuestas como 'Mañana, Noche' también terminan en 'Noche',
+    lo que causaría falsos positivos con la categoría simple 'Noche'."""
+    for c in cols:
+        sufijo = c.split("_", 1)[-1]
+        if sufijo == categoria:
+            return c
+    raise ValueError(f"No se encontró la categoría '{categoria}' entre las columnas: {cols}")
+
+
 def construir_vector_nuevo(personalidad, horario, dias_sel, motivacion,
                             deportes_sel, actividad_sel, social_vals):
     vector = {c: 0 for grupo in GRUPOS.values() for c in grupo[0]}
 
-    col_personalidad = next(c for c in GRUPOS["personalidad"][0] if c.endswith(personalidad))
-    vector[col_personalidad] = 1
-
-    col_horario = next(c for c in GRUPOS["horario"][0] if c.endswith(horario))
-    vector[col_horario] = 1
+    vector[_col_por_categoria_exacta(GRUPOS["personalidad"][0], personalidad)] = 1
+    vector[_col_por_categoria_exacta(GRUPOS["horario"][0], horario)] = 1
 
     for d in dias_sel:
-        col = next(c for c in GRUPOS["dias"][0] if c.endswith(d))
-        vector[col] = 1
+        vector[_col_por_categoria_exacta(GRUPOS["dias"][0], d)] = 1
 
-    col_motivacion = next(c for c in GRUPOS["motivacion"][0] if c.endswith(motivacion))
-    vector[col_motivacion] = 1
+    vector[_col_por_categoria_exacta(GRUPOS["motivacion"][0], motivacion)] = 1
 
     for d in deportes_sel:
-        col = next(c for c in GRUPOS["deportes"][0] if c.endswith(d))
-        vector[col] = 1
+        vector[_col_por_categoria_exacta(GRUPOS["deportes"][0], d)] = 1
 
     for a in actividad_sel:
-        col = next(c for c in GRUPOS["actividad"][0] if c.endswith(a))
-        vector[col] = 1
+        vector[_col_por_categoria_exacta(GRUPOS["actividad"][0], a)] = 1
 
     # Normalizar los 3 Likert sociales con el mismo scaler ajustado sobre los 158 estudiantes
     social_norm = scaler.transform([social_vals])[0]

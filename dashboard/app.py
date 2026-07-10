@@ -394,31 +394,6 @@ st.markdown("""
         background-color: #5C1626;
     }
 
-    /* Sidebar: opciones del menú sin fondo, solo texto en color institucional */
-    section[data-testid="stSidebar"] div[role="radiogroup"] {
-        gap: 0.3rem;
-    }
-    section[data-testid="stSidebar"] div[role="radiogroup"] label {
-        background: transparent;
-        padding: 0.3rem 0;
-    }
-    /* Punto del radio: role="slider"/"radio" es un atributo ARIA estable */
-    section[data-testid="stSidebar"] div[role="radiogroup"] label div:first-child {
-        border-color: #7A1F35 !important;
-    }
-    section[data-testid="stSidebar"] div[role="radiogroup"] label div:first-child > div {
-        background-color: #7A1F35 !important;
-    }
-    /* Opción seleccionada: texto granate y en negrita. No seleccionada: gris neutro. */
-    section[data-testid="stSidebar"] div[role="radiogroup"] label[data-checked="true"] p {
-        color: #7A1F35;
-        font-weight: 700;
-    }
-    section[data-testid="stSidebar"] div[role="radiogroup"] p {
-        color: #5B5458;
-        font-size: 0.92rem;
-    }
-
     /* Eyebrow del sidebar (encabezado "MENÚ") */
     .sidebar-eyebrow {
         color: #7A1F35;
@@ -427,6 +402,23 @@ st.markdown("""
         text-transform: uppercase;
         letter-spacing: 0.06em;
         margin: 0 0 0.5rem 0;
+    }
+
+    /* Botones del menú lateral: ocupan todo el ancho */
+    section[data-testid="stSidebar"] .stButton > button {
+        width: 100%;
+        text-align: left;
+        justify-content: flex-start;
+        border: 1px solid #E8DEE0;
+        font-weight: 500;
+    }
+    section[data-testid="stSidebar"] .stButton > button[kind="primary"] {
+        background-color: #7A1F35;
+        border-color: #7A1F35;
+    }
+    section[data-testid="stSidebar"] .stButton > button[kind="secondary"] {
+        background-color: #FFFFFF;
+        color: #211A1C;
     }
 
     /* Expander del sidebar: título en granate, borde consistente con las tarjetas */
@@ -482,11 +474,18 @@ st.markdown("""
 # ──────────────────────────────────────────────────────────────
 
 st.sidebar.markdown('<div class="sidebar-eyebrow">MENÚ</div>', unsafe_allow_html=True)
-modo = st.sidebar.radio(
-    "¿Qué quieres hacer?",
-    ["Buscar estudiante existente", "Soy un estudiante nuevo"],
-    label_visibility="collapsed",
-)
+
+if "modo" not in st.session_state:
+    st.session_state.modo = "Buscar estudiante existente"
+
+opciones_menu = ["Buscar estudiante existente", "Soy un estudiante nuevo"]
+for opcion in opciones_menu:
+    es_activo = st.session_state.modo == opcion
+    if st.sidebar.button(opcion, key=f"nav_{opcion}", type="primary" if es_activo else "secondary"):
+        st.session_state.modo = opcion
+        st.rerun()
+
+modo = st.session_state.modo
 
 with st.sidebar.expander("¿Cómo funciona?"):
     st.write(

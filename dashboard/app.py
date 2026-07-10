@@ -206,14 +206,80 @@ def mostrar_tabla_top10(top10: pd.DataFrame):
 
 
 # ──────────────────────────────────────────────────────────────
-# 4. INTERFAZ
+# 4. ESTILOS E IDENTIDAD VISUAL (colores institucionales UEES)
 # ──────────────────────────────────────────────────────────────
 
-st.title("🏅 Recomendador de Compañeros Deportivos")
-st.caption(
-    "Sistema basado en afinidad de preferencias para la integración social "
-    "de estudiantes universitarios mediante actividades deportivas."
-)
+st.markdown("""
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+
+    html, body, [class*="css"]  {
+        font-family: 'Inter', sans-serif;
+    }
+
+    /* Barra superior institucional */
+    .uees-header {
+        background: linear-gradient(90deg, #7A1F35 0%, #5C1626 100%);
+        padding: 1.4rem 2rem;
+        border-radius: 6px;
+        margin-bottom: 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+    .uees-header .mark {
+        font-family: 'Inter', sans-serif;
+        font-weight: 800;
+        font-size: 1.8rem;
+        color: #FFFFFF;
+        background: rgba(255,255,255,0.12);
+        border-radius: 8px;
+        width: 48px;
+        height: 48px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+    .uees-header .titles h1 {
+        color: #FFFFFF;
+        font-size: 1.35rem;
+        font-weight: 700;
+        margin: 0;
+        line-height: 1.2;
+    }
+    .uees-header .titles p {
+        color: rgba(255,255,255,0.85);
+        font-size: 0.85rem;
+        margin: 0.15rem 0 0 0;
+    }
+
+    /* Botones primarios */
+    .stButton > button[kind="primary"] {
+        background-color: #7A1F35;
+        border: none;
+        font-weight: 600;
+    }
+    .stButton > button[kind="primary"]:hover {
+        background-color: #5C1626;
+    }
+
+    /* Subheaders con acento granate */
+    h2, h3 {
+        color: #5C1626;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+st.markdown("""
+<div class="uees-header">
+    <div class="mark">U</div>
+    <div class="titles">
+        <h1>Recomendador de Compañeros Deportivos</h1>
+        <p>Universidad de Especialidades Espíritu Santo — Sistema de recomendación por afinidad</p>
+    </div>
+</div>
+""", unsafe_allow_html=True)
 
 modo = st.sidebar.radio("¿Qué quieres hacer?", ["Buscar estudiante existente", "Soy un estudiante nuevo"])
 
@@ -225,68 +291,72 @@ if modo == "Buscar estudiante existente":
 
     col1, col2 = st.columns([1, 2])
     with col1:
-        st.subheader(f"Perfil — Estudiante #{id_sel}")
-        mostrar_perfil(fila)
+        with st.container(border=True):
+            st.subheader(f"Perfil — Estudiante #{id_sel}")
+            mostrar_perfil(fila)
 
     with col2:
-        st.subheader("TOP-10 compañeros más compatibles")
-        top10 = top10_para_id(id_sel)
-        mostrar_tabla_top10(top10)
+        with st.container(border=True):
+            st.subheader("TOP-10 compañeros más compatibles")
+            top10 = top10_para_id(id_sel)
+            mostrar_tabla_top10(top10)
 
 else:
     st.header("Ingresa tu perfil")
     st.write("Responde como en la encuesta original. Tus datos no se guardan.")
 
-    col1, col2 = st.columns(2)
+    with st.container(border=True):
+        col1, col2 = st.columns(2)
 
-    with col1:
-        personalidad = st.selectbox(
-            "¿Cómo describirías tu personalidad?",
-            ["Introvertida", "Extrovertida", "Ambidivertida"],
-        )
-        motivacion = st.selectbox(
-            "¿Cuál es tu principal motivación para hacer deporte?",
-            ["Competencia", "Diversión", "Mejorar condición física",
-             "Mejorar salud", "Reducir estrés", "Socializar"],
-        )
-        horario = st.selectbox(
-            "¿En qué horarios prefieres realizar actividades deportivas?",
-            ["Mañana", "Mañana, Noche", "Mañana, Tarde", "Mañana, Tarde, Noche",
-             "Noche", "Tarde", "Tarde, Noche"],
-        )
-        dias_sel = st.multiselect(
-            "¿Qué días tienes disponibilidad?",
-            ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"],
-        )
-
-    with col2:
-        deportes_sel = st.multiselect(
-            "¿Qué deportes practicas o te interesan?",
-            ["Baile", "Basket", "Fútbol", "Gym/Fitness", "Natación",
-             "Pádel", "Running", "Tenis", "Tenis de mesa", "Volley"],
-        )
-        actividad_sel = st.multiselect(
-            "¿Qué tipo de actividades prefieres?",
-            ["Al aire libre", "Bajo techo", "Competitivas",
-             "Grupales", "Individuales", "Recreativas"],
-        )
-        st.write("**Perfil social** (escala 1 a 5):")
-        s1 = st.slider("Me considero una persona sociable.", 1, 5, 3)
-        s2 = st.slider("Me siento cómodo/a participando en actividades grupales.", 1, 5, 3)
-        s3 = st.slider("¿Qué tan fácil se te hace hacer nuevas amistades?", 1, 5, 3)
-
-    if st.button("Obtener mis recomendaciones", type="primary"):
-        if not dias_sel:
-            st.warning("Selecciona al menos un día de disponibilidad.")
-        else:
-            vector_nuevo = construir_vector_nuevo(
-                personalidad, horario, dias_sel, motivacion,
-                deportes_sel, actividad_sel, [s1, s2, s3],
+        with col1:
+            personalidad = st.selectbox(
+                "¿Cómo describirías tu personalidad?",
+                ["Introvertida", "Extrovertida", "Ambidivertida"],
             )
-            with st.spinner("Calculando afinidad con los 158 estudiantes..."):
-                top10 = top10_para_vector(vector_nuevo)
-                cluster_asignado = asignar_cluster_nuevo(top10)
+            motivacion = st.selectbox(
+                "¿Cuál es tu principal motivación para hacer deporte?",
+                ["Competencia", "Diversión", "Mejorar condición física",
+                 "Mejorar salud", "Reducir estrés", "Socializar"],
+            )
+            horario = st.selectbox(
+                "¿En qué horarios prefieres realizar actividades deportivas?",
+                ["Mañana", "Mañana, Noche", "Mañana, Tarde", "Mañana, Tarde, Noche",
+                 "Noche", "Tarde", "Tarde, Noche"],
+            )
+            dias_sel = st.multiselect(
+                "¿Qué días tienes disponibilidad?",
+                ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"],
+            )
 
-            st.success(f"Perteneces al **Cluster {cluster_asignado}** (asignado por afinidad con tus vecinos más cercanos).")
-            st.subheader("Tu TOP-10 de compañeros más compatibles")
-            mostrar_tabla_top10(top10)
+        with col2:
+            deportes_sel = st.multiselect(
+                "¿Qué deportes practicas o te interesan?",
+                ["Baile", "Basket", "Fútbol", "Gym/Fitness", "Natación",
+                 "Pádel", "Running", "Tenis", "Tenis de mesa", "Volley"],
+            )
+            actividad_sel = st.multiselect(
+                "¿Qué tipo de actividades prefieres?",
+                ["Al aire libre", "Bajo techo", "Competitivas",
+                 "Grupales", "Individuales", "Recreativas"],
+            )
+            st.write("**Perfil social** (escala 1 a 5):")
+            s1 = st.slider("Me considero una persona sociable.", 1, 5, 3)
+            s2 = st.slider("Me siento cómodo/a participando en actividades grupales.", 1, 5, 3)
+            s3 = st.slider("¿Qué tan fácil se te hace hacer nuevas amistades?", 1, 5, 3)
+
+        if st.button("Obtener mis recomendaciones", type="primary"):
+            if not dias_sel:
+                st.warning("Selecciona al menos un día de disponibilidad.")
+            else:
+                vector_nuevo = construir_vector_nuevo(
+                    personalidad, horario, dias_sel, motivacion,
+                    deportes_sel, actividad_sel, [s1, s2, s3],
+                )
+                with st.spinner("Calculando afinidad con los 158 estudiantes..."):
+                    top10 = top10_para_vector(vector_nuevo)
+                    cluster_asignado = asignar_cluster_nuevo(top10)
+
+                st.success(f"Perteneces al **Cluster {cluster_asignado}** (asignado por afinidad con tus vecinos más cercanos).")
+                with st.container(border=True):
+                    st.subheader("Tu TOP-10 de compañeros más compatibles")
+                    mostrar_tabla_top10(top10)

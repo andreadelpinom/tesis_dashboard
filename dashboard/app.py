@@ -234,31 +234,38 @@ def mostrar_perfil(fila: pd.Series):
 def _fila_tabla_html(fila: dict, similitud_max: float = 1.0) -> str:
     porcentaje = max(0.0, min(100.0, (fila["Similitud"] / similitud_max) * 100))
     _, color_cluster = CLUSTER_INFO.get(fila["Cluster"], ("", "#5B5458"))
-    return f"""
-    <tr>
-        <td style="padding:0.6rem 0.8rem; font-weight:600; color:#211A1C;">{fila['ID']}</td>
-        <td style="padding:0.6rem 0.8rem; min-width:160px;">
-            <div style="display:flex; align-items:center; gap:0.6rem;">
-                <div style="flex:1; background:#EFE2E5; border-radius:999px; height:8px; overflow:hidden;">
-                    <div style="width:{porcentaje:.1f}%; background:#7A1F35; height:100%; border-radius:999px;"></div>
-                </div>
-                <span style="font-weight:700; color:#7A1F35; font-size:0.85rem; white-space:nowrap;">
-                    {porcentaje:.0f}%
-                </span>
-            </div>
-        </td>
-        <td style="padding:0.6rem 0.8rem; color:#211A1C;">{fila['Personalidad']}</td>
-        <td style="padding:0.6rem 0.8rem; color:#211A1C;">{fila['Horario']}</td>
-        <td style="padding:0.6rem 0.8rem; color:#211A1C;">{fila['Motivación']}</td>
-        <td style="padding:0.6rem 0.8rem; color:#211A1C;">{fila['Días']}</td>
-        <td style="padding:0.6rem 0.8rem;">
-            <span style="display:inline-flex; align-items:center; gap:0.35rem; font-size:0.85rem; color:#211A1C;">
-                <span style="width:9px; height:9px; border-radius:50%; background:{color_cluster}; display:inline-block;"></span>
-                {fila['Cluster']}
-            </span>
-        </td>
-    </tr>
-    """
+    return (
+        '<tr>'
+        f'<td style="padding:0.6rem 0.8rem; font-weight:600; color:#211A1C;">{fila["ID"]}</td>'
+        '<td style="padding:0.6rem 0.8rem; min-width:160px;">'
+        '<div style="display:flex; align-items:center; gap:0.6rem;">'
+        '<div style="flex:1; background:#EFE2E5; border-radius:999px; height:8px; overflow:hidden;">'
+        f'<div style="width:{porcentaje:.1f}%; background:#7A1F35; height:100%; border-radius:999px;"></div>'
+        '</div>'
+        f'<span style="font-weight:700; color:#7A1F35; font-size:0.85rem; white-space:nowrap;">{porcentaje:.0f}%</span>'
+        '</div></td>'
+        f'<td style="padding:0.6rem 0.8rem; color:#211A1C;">{fila["Personalidad"]}</td>'
+        f'<td style="padding:0.6rem 0.8rem; color:#211A1C;">{fila["Horario"]}</td>'
+        f'<td style="padding:0.6rem 0.8rem; color:#211A1C;">{fila["Motivación"]}</td>'
+        f'<td style="padding:0.6rem 0.8rem; color:#211A1C;">{fila["Días"]}</td>'
+        '<td style="padding:0.6rem 0.8rem;">'
+        f'<span style="display:inline-flex; align-items:center; gap:0.35rem; font-size:0.85rem; color:#211A1C;">'
+        f'<span style="width:9px; height:9px; border-radius:50%; background:{color_cluster}; display:inline-block;"></span>'
+        f'{fila["Cluster"]}</span></td>'
+        '</tr>'
+    )
+
+
+def _kpi_card(label: str, valor: str) -> str:
+    return (
+        f'<div style="background:#FFFFFF; border:1px solid #E8DEE0; border-radius:10px; '
+        f'padding:0.9rem 1.1rem; flex:1;">'
+        f'<div style="color:#5B5458; font-size:0.78rem; font-weight:600; margin-bottom:0.35rem; '
+        f'line-height:1.3;">{label}</div>'
+        f'<div style="color:#211A1C; font-size:1.4rem; font-weight:700; line-height:1.25; '
+        f'word-break:break-word;">{valor}</div>'
+        f'</div>'
+    )
 
 
 def mostrar_tabla_top10(top10: pd.DataFrame):
@@ -278,47 +285,39 @@ def mostrar_tabla_top10(top10: pd.DataFrame):
 
     # KPIs con lenguaje directo: se evita jerga técnica ("similitud ponderada")
     # y se usa porcentaje en vez de decimales (0.729 es menos intuitivo que 73%).
+    # Se usan tarjetas HTML propias (no st.metric) porque st.metric trunca con "…"
+    # cuando la etiqueta o el valor son largos, cortando información importante.
     mejor = df_tabla.iloc[0]
     cluster_top_id = int(df_tabla["Cluster"].mode()[0])
     nombre_cluster_top, _ = CLUSTER_INFO.get(cluster_top_id, (f"Cluster {cluster_top_id}", "#5B5458"))
 
-    k1, k2, k3 = st.columns(3)
-    k1.metric(
-        "Compatibilidad promedio con tus 10 recomendados",
-        f"{df_tabla['Similitud'].mean() * 100:.0f}%",
+    kpis_html = (
+        '<div style="display:flex; gap:0.8rem; flex-wrap:wrap; margin-bottom:0.8rem;">'
+        + _kpi_card("Compatibilidad promedio con tus 10 recomendados", f"{df_tabla['Similitud'].mean() * 100:.0f}%")
+        + _kpi_card("Tu compañero más compatible", f"#{int(mejor['ID'])} · {mejor['Similitud'] * 100:.0f}%")
+        + _kpi_card("Grupo con más compañeros afines", nombre_cluster_top)
+        + '</div>'
     )
-    k2.metric(
-        "Tu compañero más compatible",
-        f"#{int(mejor['ID'])} ({mejor['Similitud'] * 100:.0f}%)",
-    )
-    k3.metric(
-        "Grupo con más compañeros afines",
-        nombre_cluster_top,
-    )
-
-    st.markdown("<div style='height:0.6rem'></div>", unsafe_allow_html=True)
+    st.markdown(kpis_html, unsafe_allow_html=True)
 
     filas_html = "".join(_fila_tabla_html(f) for f in filas)
-    tabla_html = f"""
-    <div style="overflow-x:auto; border:1px solid #E8DEE0; border-radius:10px;">
-    <table style="width:100%; border-collapse:collapse; font-family:'Inter',sans-serif; font-size:0.88rem;">
-        <thead>
-            <tr style="background:#FAF7F7; border-bottom:1px solid #E8DEE0;">
-                <th style="padding:0.6rem 0.8rem; text-align:left; color:#5B5458; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.03em;">ID</th>
-                <th style="padding:0.6rem 0.8rem; text-align:left; color:#5B5458; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.03em;">Compatibilidad</th>
-                <th style="padding:0.6rem 0.8rem; text-align:left; color:#5B5458; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.03em;">Personalidad</th>
-                <th style="padding:0.6rem 0.8rem; text-align:left; color:#5B5458; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.03em;">Horario</th>
-                <th style="padding:0.6rem 0.8rem; text-align:left; color:#5B5458; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.03em;">Motivación</th>
-                <th style="padding:0.6rem 0.8rem; text-align:left; color:#5B5458; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.03em;">Días</th>
-                <th style="padding:0.6rem 0.8rem; text-align:left; color:#5B5458; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.03em;">Cluster</th>
-            </tr>
-        </thead>
-        <tbody>
-            {filas_html}
-        </tbody>
-    </table>
-    </div>
-    """
+    # IMPORTANTE: el HTML va en una sola línea, sin saltos de línea ni indentación.
+    # Streamlit interpreta líneas en blanco dentro de un bloque markdown como
+    # separadores de párrafo, incluso con unsafe_allow_html=True; eso rompe una
+    # tabla en varios fragmentos y deja etiquetas como "</tbody>" visibles como texto.
+    tabla_html = (
+        '<div style="overflow-x:auto; border:1px solid #E8DEE0; border-radius:10px;">'
+        '<table style="width:100%; border-collapse:collapse; font-family:\'Inter\',sans-serif; font-size:0.88rem;">'
+        '<thead><tr style="background:#FAF7F7; border-bottom:1px solid #E8DEE0;">'
+        '<th style="padding:0.6rem 0.8rem; text-align:left; color:#5B5458; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.03em;">ID</th>'
+        '<th style="padding:0.6rem 0.8rem; text-align:left; color:#5B5458; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.03em;">Compatibilidad</th>'
+        '<th style="padding:0.6rem 0.8rem; text-align:left; color:#5B5458; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.03em;">Personalidad</th>'
+        '<th style="padding:0.6rem 0.8rem; text-align:left; color:#5B5458; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.03em;">Horario</th>'
+        '<th style="padding:0.6rem 0.8rem; text-align:left; color:#5B5458; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.03em;">Motivación</th>'
+        '<th style="padding:0.6rem 0.8rem; text-align:left; color:#5B5458; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.03em;">Días</th>'
+        '<th style="padding:0.6rem 0.8rem; text-align:left; color:#5B5458; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.03em;">Cluster</th>'
+        '</tr></thead><tbody>' + filas_html + '</tbody></table></div>'
+    )
     st.markdown(tabla_html, unsafe_allow_html=True)
 
 
@@ -416,6 +415,20 @@ st.markdown("""
     [data-testid="stMetricValue"] {
         font-variant-numeric: tabular-nums;
         color: #211A1C;
+    }
+
+    /* Sliders: pista y punto en color institucional (por defecto Streamlit los pinta rojo/naranja) */
+    div[data-testid="stSlider"] [role="slider"] {
+        background-color: #7A1F35 !important;
+        border-color: #7A1F35 !important;
+    }
+    div[data-testid="stSlider"] > div > div > div > div {
+        background-color: #7A1F35 !important;
+    }
+
+    /* Multiselect: etiquetas seleccionadas en color institucional */
+    span[data-baseweb="tag"] {
+        background-color: #7A1F35 !important;
     }
 </style>
 """, unsafe_allow_html=True)
